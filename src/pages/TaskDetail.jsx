@@ -306,19 +306,27 @@ function NewTaskForm({ navigate, currentUser }) {
         <button onClick={save} className="text-blue-600 font-semibold text-sm">Save</button>
       </div>
       <div className="px-4 py-3 space-y-3">
-        <div className="flex gap-2 items-center">
-          <span className="text-xs text-gray-500">Voice in:</span>
-          {[['en-IN', 'English'], ['hi-IN', 'Hindi']].map(([code, label]) => (
-            <button key={code} type="button" onClick={() => setVoiceLang(code)} className={`text-xs px-3 py-1 rounded-full ${voiceLang === code ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>{label}</button>
-          ))}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setVoiceLang('en-IN'); setTimeout(toggleVoice, 0) }}
+            disabled={recording}
+            className={`flex-1 py-3 rounded-xl text-sm font-semibold ${recording && voiceLang === 'en-IN' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-blue-50 text-blue-700 border-2 border-dashed border-blue-300'} disabled:opacity-50`}
+          >
+            {recording && voiceLang === 'en-IN' ? '⏹ Stop' : '🎤 Speak (English)'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setVoiceLang('hi-IN'); setTimeout(toggleVoice, 0) }}
+            disabled={recording}
+            className={`flex-1 py-3 rounded-xl text-sm font-semibold ${recording && voiceLang === 'hi-IN' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-orange-50 text-orange-700 border-2 border-dashed border-orange-300'} disabled:opacity-50`}
+          >
+            {recording && voiceLang === 'hi-IN' ? '⏹ रोकें' : '🎤 बोलें (हिंदी)'}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={toggleVoice}
-          className={`w-full py-3 rounded-xl text-sm font-semibold ${recording ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-blue-50 text-blue-700 border-2 border-dashed border-blue-300'}`}
-        >
-          {recording ? '⏹ Stop recording' : `🎤 Speak the task in ${voiceLang === 'en-IN' ? 'English' : 'Hindi'} (auto-fills below)`}
-        </button>
+        {recording && (
+          <button type="button" onClick={toggleVoice} className="w-full py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-medium">⏹ Stop recording</button>
+        )}
         <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Task title" className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none" />
         <select value={selectedSpace} onChange={e => setSelectedSpace(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none bg-white">
           <option value="">Select space</option>

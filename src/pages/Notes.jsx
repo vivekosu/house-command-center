@@ -140,19 +140,29 @@ export default function Notes() {
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none resize-none mb-2"
             />
             <div className="flex gap-2 mb-2">
-              <span className="text-xs text-gray-500 self-center mr-1">Voice in:</span>
-              {[['en-IN', 'English'], ['hi-IN', 'Hindi']].map(([code, label]) => (
-                <button key={code} onClick={() => setVoiceLang(code)} className={`text-xs px-3 py-1 rounded-full ${voiceLang === code ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>{label}</button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={toggleVoice} className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${recording ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-gray-100 text-gray-700'}`}>
-                {recording ? '⏹ Stop recording' : '🎤 Voice note'}
+              <button
+                onClick={() => { setVoiceLang('en-IN'); setTimeout(toggleVoice, 0) }}
+                disabled={recording}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${recording && voiceLang === 'en-IN' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-blue-50 text-blue-700 border border-blue-200'} disabled:opacity-50`}
+              >
+                {recording && voiceLang === 'en-IN' ? '⏹ Stop' : '🎤 Voice (English)'}
               </button>
+              <button
+                onClick={() => { setVoiceLang('hi-IN'); setTimeout(toggleVoice, 0) }}
+                disabled={recording}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${recording && voiceLang === 'hi-IN' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-orange-50 text-orange-700 border border-orange-200'} disabled:opacity-50`}
+              >
+                {recording && voiceLang === 'hi-IN' ? '⏹ रोकें' : '🎤 आवाज़ (हिंदी)'}
+              </button>
+            </div>
+            {recording && (
+              <button onClick={toggleVoice} className="w-full py-2 bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-medium mb-2">⏹ Stop recording</button>
+            )}
+            <div className="flex gap-2">
               <button onClick={() => { setShowForm(false); setContent(''); setEntityId(''); setUsedVoice(false) }} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm">Cancel</button>
               <button onClick={saveNote} className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold">Save</button>
             </div>
-            <div className="text-[11px] text-gray-400 mt-2">Speak in the selected language. The app does NOT translate — speak the language you want stored.</div>
+            <div className="text-[11px] text-gray-400 mt-2">Tap "English" to dictate in English, or "हिंदी" to dictate in Hindi script. The app does not translate.</div>
           </div>
         )}
 
