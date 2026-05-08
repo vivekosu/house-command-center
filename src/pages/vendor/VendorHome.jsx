@@ -14,10 +14,12 @@ export default function VendorHome() {
     if (!currentUser?.id) return
     supabase.from('task_vendors').select('*, tasks(*, spaces(name,floor), categories(name))').eq('vendor_id', currentUser.id)
       .then(({ data }) => {
-        const active = (data || []).map(tv => tv.tasks).filter(t => t && !['done','verified','closed'].includes(t.status))
+        const active = (data || [])
+          .map(tv => tv.tasks)
+          .filter(t => t && !['done','verified','closed'].includes(t.status))
         setTasks(active); setLoading(false)
       })
-  }, [currentUser])
+  }, [currentUser?.id])
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">

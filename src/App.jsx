@@ -14,6 +14,7 @@ import Templates from './pages/Templates'
 import Clarifications from './pages/Clarifications'
 import WeeklyPlan from './pages/WeeklyPlan'
 import Photos from './pages/Photos'
+import Notes from './pages/Notes'
 import Config from './pages/Config'
 import VendorEntry from './pages/vendor/VendorEntry'
 import VendorHome from './pages/vendor/VendorHome'
@@ -35,8 +36,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/v/:token" element={<VendorEntry />} />
-      <Route path="/vendor/home" element={<VendorHome />} />
-      <Route path="/vendor/task/:id" element={<VendorTask />} />
+      <Route path="/vendor/home" element={currentUser?.roleType === 'vendor' ? <VendorHome /> : <Navigate to="/" />} />
+      <Route path="/vendor/task/:id" element={currentUser?.roleType === 'vendor' ? <VendorTask /> : <Navigate to="/" />} />
       <Route path="/team/:token" element={<TeamEntry />} />
       <Route path="/" element={currentUser ? <Navigate to="/today" /> : <WhoAreYou />} />
       <Route path="/today" element={currentUser ? <Today /> : <Navigate to="/" />} />
@@ -50,6 +51,7 @@ function AppRoutes() {
       <Route path="/clarifications" element={currentUser ? <Clarifications /> : <Navigate to="/" />} />
       <Route path="/weekly" element={currentUser ? <WeeklyPlan /> : <Navigate to="/" />} />
       <Route path="/photos" element={currentUser ? <Photos /> : <Navigate to="/" />} />
+      <Route path="/notes" element={currentUser ? <Notes /> : <Navigate to="/" />} />
       <Route path="/config" element={currentUser?.role === 'owner' ? <Config /> : <Navigate to="/" />} />
     </Routes>
   )

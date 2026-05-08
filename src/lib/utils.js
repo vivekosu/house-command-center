@@ -8,7 +8,9 @@ export function formatDate(date) {
 export function daysOverdue(endDate) {
   if (!endDate) return 0
   const d = typeof endDate === 'string' ? parseISO(endDate) : endDate
-  if (isBefore(d, new Date())) return differenceInDays(new Date(), d)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (isBefore(d, today)) return differenceInDays(today, d)
   return 0
 }
 

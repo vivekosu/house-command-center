@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useRole } from '../context/RoleContext'
 import { formatDate } from '../lib/utils'
 import { generateVendorLink } from '../lib/roleLoader'
+import ContactPicker from '../components/contacts/ContactPicker'
 
 export default function VendorDetail() {
   const { id } = useParams()
@@ -15,6 +16,7 @@ export default function VendorDetail() {
   const [categories, setCategories] = useState([])
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({})
+  const [showContactPicker, setShowContactPicker] = useState(false)
   const isNew = id === 'new'
 
   useEffect(() => {
@@ -43,12 +45,28 @@ export default function VendorDetail() {
 
   if (isNew || editing) return (
     <div className="min-h-screen bg-gray-50">
+      {showContactPicker && (
+        <ContactPicker
+          onClose={() => setShowContactPicker(false)}
+          onPick={({ name, phone }) => {
+            setForm({ ...form, name, phone, whatsapp_phone: form.whatsapp_phone || phone })
+            setShowContactPicker(false)
+          }}
+        />
+      )}
       <div className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 sticky top-0 z-40">
         <button onClick={() => isNew ? navigate(-1) : setEditing(false)} className="text-blue-600 font-medium text-sm">Cancel</button>
         <div className="flex-1 font-bold text-gray-900 text-sm">{isNew ? 'New Vendor' : 'Edit Vendor'}</div>
         <button onClick={save} className="text-blue-600 font-semibold text-sm">Save</button>
       </div>
       <div className="px-4 py-3 space-y-3">
+        <button
+          type="button"
+          onClick={() => setShowContactPicker(true)}
+          className="w-full border-2 border-dashed border-blue-300 bg-blue-50 text-blue-700 py-3 rounded-xl text-sm font-semibold"
+        >
+          📱 Pick from phone contacts
+        </button>
         {[['Name','name','text'],['Phone','phone','tel'],['WhatsApp','whatsapp_phone','tel']].map(([label, key, type]) => (
           <input key={key} type={type} value={form[key] || ''} onChange={e => setForm({...form, [key]: e.target.value})} placeholder={label} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none" />
         ))}

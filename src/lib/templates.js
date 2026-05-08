@@ -48,6 +48,7 @@ export function buildMessage(templateKey, params, vendorLanguage = 'bilingual') 
   if (!tpl) return ''
   const { en, hi } = tpl.build(params)
   if (vendorLanguage === 'english') return en
+  if (vendorLanguage === 'hindi') return hi
   return `${en}\n\n---\n\n${hi}`
 }
 

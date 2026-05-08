@@ -17,7 +17,10 @@ export default function Promises() {
 
   async function loadPromises() {
     setLoading(true)
-    let q = supabase.from('promises').select('*, vendors(name,phone), tasks(title)').order('promised_date', { ascending: true })
+    let q = supabase.from('promises')
+      .select('*, vendors(name,phone), tasks!inner(title, project_id)')
+      .eq('tasks.project_id', import.meta.env.VITE_PROJECT_ID)
+      .order('promised_date', { ascending: true })
     if (filter !== 'all') q = q.eq('status', filter)
     const { data } = await q
     setPromises(data || [])

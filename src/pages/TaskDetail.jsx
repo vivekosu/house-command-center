@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useRole } from '../context/RoleContext'
 import { daysOverdue, formatDate, escalationLevel } from '../lib/utils'
+import { startVoiceRecognition, parseTranscriptToTask } from '../lib/voice'
 import PhotoUpload from '../components/ui/PhotoUpload'
 
 const STATUSES = ['planned','in_progress','waiting_vendor','waiting_material','waiting_decision','blocked','delayed','done','verified']
@@ -18,6 +19,14 @@ export default function TaskDetail() {
   const [note, setNote] = useState('')
   const [showPhotoUpload, setShowPhotoUpload] = useState(false)
   const [showStatusPicker, setShowStatusPicker] = useState(false)
+  const [showPromiseForm, setShowPromiseForm] = useState(false)
+  const [promiseForm, setPromiseForm] = useState({
+    vendor_id: '',
+    promise_type: 'complete_work',
+    promised_date: new Date().toISOString().split('T')[0],
+    workers_promised: '',
+    description: ''
+  })
   const isNew = id === 'new'
 
   useEffect(() => { if (!isNew) loadTask() }, [id])
@@ -41,6 +50,26 @@ export default function TaskDetail() {
   async function updateStatus(status) {
     await supabase.from('tasks').update({ status, ...(status === 'done' ? { actual_end_date: new Date().toISOString() } : {}) }).eq('id', id)
     setShowStatusPicker(false); loadTask()
+  }
+
+  async function savePromise() {
+    if (!promiseForm.vendor_id) return alert('Pick a vendor')
+    if (!promiseForm.promised_date) return alert('Pick a date')
+    const payload = {
+      task_id: id,
+      vendor_id: promiseForm.vendor_id,
+      promise_type: promiseForm.promise_type,
+      promised_date: promiseForm.promised_date,
+      workers_promised: promiseForm.workers_promised ? parseInt(promiseForm.workers_promised) : null,
+      description: promiseForm.description.trim() || null,
+      status: 'pending',
+      logged_by: currentUser?.id
+    }
+    const { error } = await supabase.from('promises').insert(payload)
+    if (error) return alert('Failed: ' + error.message)
+    setShowPromiseForm(false)
+    setPromiseForm({ vendor_id: '', promise_type: 'complete_work', promised_date: new Date().toISOString().split('T')[0], workers_promised: '', description: '' })
+    loadTask()
   }
 
   if (isNew) return <NewTaskForm navigate={navigate} currentUser={currentUser} />
@@ -84,15 +113,22 @@ export default function TaskDetail() {
               const v = tv.vendors; if (!v) return null
               const esc = escalationLevel(v.missed_count || 0)
               return (
-                <div key={v.id} className="flex items-center justify-between py-1.5">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{v.name}</div>
-                    <div className="text-xs text-gray-400">{v.phone} · missed: {v.missed_count || 0}</div>
+                <div key={v.id} className="py-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900">{v.name}</div>
+                      <div className="text-xs text-gray-400">{v.phone} · missed: {v.missed_count || 0}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <a href={`tel:${v.phone}`} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-lg">Call</a>
+                      <a href={`https://wa.me/${v.phone?.replace(/\D/g,'')}`} target="_blank" className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-lg">WhatsApp</a>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <a href={`tel:${v.phone}`} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-lg">Call</a>
-                    <a href={`https://wa.me/${v.phone?.replace(/\D/g,'')}`} target="_blank" className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-lg">WhatsApp</a>
-                  </div>
+                  {esc && (
+                    <div className={`mt-1.5 text-[11px] px-2 py-1 rounded-lg font-medium ${esc.level <= 2 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                      ⚠️ Escalation level {esc.level}: {esc.action}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -110,15 +146,50 @@ export default function TaskDetail() {
           </div>
         </div>
 
-        {promises.length > 0 && (
-          <div className="bg-white border border-gray-100 rounded-xl p-3 mb-3">
-            <div className="text-xs font-bold text-gray-500 mb-2">Promises ({promises.length})</div>
-            {promises.slice(0, 3).map(p => (
-              <div key={p.id} className="flex items-center justify-between py-1 border-b border-gray-50 last:border-0">
-                <div className="text-xs text-gray-700">{p.promise_type?.replace('_',' ')} · {formatDate(p.promised_date)}</div>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === 'kept' ? 'bg-green-50 text-green-600' : p.status === 'missed' ? 'bg-red-50 text-red-600' : 'bg-yellow-50 text-yellow-600'}`}>{p.status}</span>
+        <div className="bg-white border border-gray-100 rounded-xl p-3 mb-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold text-gray-500">Promises ({promises.length})</div>
+            {isEditor && vendors.length > 0 && (
+              <button onClick={() => { setPromiseForm({ ...promiseForm, vendor_id: vendors[0]?.vendors?.id || '' }); setShowPromiseForm(true) }} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-lg font-medium">+ Log promise</button>
+            )}
+          </div>
+          {promises.length === 0 && <div className="text-xs text-gray-400 py-2">No promises logged yet</div>}
+          {promises.slice(0, 5).map(p => (
+            <div key={p.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+              <div className="flex-1">
+                <div className="text-xs text-gray-700">{p.promise_type?.replace(/_/g,' ')} · {formatDate(p.promised_date)}{p.workers_promised ? ` · ${p.workers_promised} workers` : ''}</div>
+                {p.description && <div className="text-[11px] text-gray-400 mt-0.5">{p.description}</div>}
               </div>
-            ))}
+              <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === 'kept' ? 'bg-green-50 text-green-600' : p.status === 'missed' ? 'bg-red-50 text-red-600' : 'bg-yellow-50 text-yellow-600'}`}>{p.status}</span>
+            </div>
+          ))}
+        </div>
+
+        {showPromiseForm && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center" onClick={() => setShowPromiseForm(false)}>
+            <div className="bg-white rounded-t-2xl w-full max-w-md p-5 pb-8" onClick={e => e.stopPropagation()}>
+              <div className="w-8 h-1 bg-gray-200 rounded mx-auto mb-4" />
+              <div className="font-bold text-gray-900 mb-3">Log a promise</div>
+              <select value={promiseForm.vendor_id} onChange={e => setPromiseForm({ ...promiseForm, vendor_id: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-white mb-2">
+                <option value="">Pick vendor…</option>
+                {vendors.map(tv => tv.vendors && <option key={tv.vendors.id} value={tv.vendors.id}>{tv.vendors.name}</option>)}
+              </select>
+              <select value={promiseForm.promise_type} onChange={e => setPromiseForm({ ...promiseForm, promise_type: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none bg-white mb-2">
+                <option value="complete_work">Complete work</option>
+                <option value="start_work">Start work</option>
+                <option value="send_workers">Send workers</option>
+                <option value="deliver_material">Deliver material</option>
+                <option value="send_invoice">Send invoice</option>
+                <option value="other">Other</option>
+              </select>
+              <input type="date" value={promiseForm.promised_date} onChange={e => setPromiseForm({ ...promiseForm, promised_date: e.target.value })} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none mb-2" />
+              <input type="number" value={promiseForm.workers_promised} onChange={e => setPromiseForm({ ...promiseForm, workers_promised: e.target.value })} placeholder="Workers promised (optional)" className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none mb-2" />
+              <textarea value={promiseForm.description} onChange={e => setPromiseForm({ ...promiseForm, description: e.target.value })} placeholder="Description (optional)" rows={2} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none resize-none mb-3" />
+              <div className="flex gap-2">
+                <button onClick={() => setShowPromiseForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-3 rounded-xl text-sm">Cancel</button>
+                <button onClick={savePromise} className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-sm font-semibold">Save promise</button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -163,6 +234,8 @@ function NewTaskForm({ navigate, currentUser }) {
   const [selectedSpace, setSelectedSpace] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedVendors, setSelectedVendors] = useState([])
+  const [recording, setRecording] = useState(false)
+  const [recRef, setRecRef] = useState(null)
 
   useEffect(() => {
     Promise.all([
@@ -174,9 +247,34 @@ function NewTaskForm({ navigate, currentUser }) {
     })
   }, [])
 
+  function toggleVoice() {
+    if (recording) {
+      recRef?.stop()
+      setRecording(false)
+      return
+    }
+    setRecording(true)
+    const r = startVoiceRecognition({
+      onResult: (text) => {
+        const parsed = parseTranscriptToTask(text)
+        // Try to match suggested floor and category to actual records
+        const matchSpace = spaces.find(s => s.floor === parsed.floor)
+        const matchCat = categories.find(c => c.name.toLowerCase() === parsed.category.toLowerCase())
+        setForm(f => ({ ...f, title: parsed.title, priority: parsed.priority }))
+        if (matchSpace) setSelectedSpace(matchSpace.id)
+        if (matchCat) setSelectedCategory(matchCat.id)
+      },
+      onEnd: () => setRecording(false),
+      onError: (err) => { setRecording(false); alert('Voice error: ' + err) }
+    })
+    setRecRef(r)
+    if (!r) setRecording(false)
+  }
+
   async function save() {
     if (!form.title.trim()) return
-    const { data: task } = await supabase.from('tasks').insert({ ...form, project_id: import.meta.env.VITE_PROJECT_ID, space_id: selectedSpace || null, category_id: selectedCategory || null, created_by: currentUser?.id }).select().single()
+    const { data: task, error } = await supabase.from('tasks').insert({ ...form, project_id: import.meta.env.VITE_PROJECT_ID, space_id: selectedSpace || null, category_id: selectedCategory || null, created_by: currentUser?.id }).select().single()
+    if (error || !task) { alert('Failed to save task. Please try again.'); return }
     if (task && selectedVendors.length > 0) {
       await supabase.from('task_vendors').insert(selectedVendors.map(vid => ({ task_id: task.id, vendor_id: vid, is_primary: true })))
     }
@@ -191,6 +289,13 @@ function NewTaskForm({ navigate, currentUser }) {
         <button onClick={save} className="text-blue-600 font-semibold text-sm">Save</button>
       </div>
       <div className="px-4 py-3 space-y-3">
+        <button
+          type="button"
+          onClick={toggleVoice}
+          className={`w-full py-3 rounded-xl text-sm font-semibold ${recording ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-blue-50 text-blue-700 border-2 border-dashed border-blue-300'}`}
+        >
+          {recording ? '⏹ Stop recording' : '🎤 Speak the task (auto-fills below)'}
+        </button>
         <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Task title" className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none" />
         <select value={selectedSpace} onChange={e => setSelectedSpace(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none bg-white">
           <option value="">Select space</option>

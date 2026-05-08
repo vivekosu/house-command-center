@@ -17,7 +17,19 @@ export default function Photos() {
   useEffect(() => { loadPhotos() }, [])
 
   async function loadPhotos() {
-    const { data } = await supabase.from('photos').select('*, tasks(title), users(name), vendors(name)').eq('tasks.project_id', import.meta.env.VITE_PROJECT_ID).order('taken_at', { ascending: false }).limit(100)
+    // First get task IDs for this project, then fetch photos for those tasks
+    const { data: projectTasks } = await supabase
+      .from('tasks')
+      .select('id')
+      .eq('project_id', import.meta.env.VITE_PROJECT_ID)
+    const taskIds = (projectTasks || []).map(t => t.id)
+    if (taskIds.length === 0) { setPhotos([]); setLoading(false); return }
+    const { data } = await supabase
+      .from('photos')
+      .select('*, tasks(title), users(name), vendors(name)')
+      .in('task_id', taskIds)
+      .order('taken_at', { ascending: false })
+      .limit(100)
     setPhotos(data || [])
     setLoading(false)
   }

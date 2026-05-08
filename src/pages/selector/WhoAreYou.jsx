@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useRole } from '../../context/RoleContext'
 
-console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL)
-console.log('Project ID:', import.meta.env.VITE_PROJECT_ID)
-
 const ROLE_COLORS = {
   owner: 'bg-blue-100 text-blue-800',
   editor: 'bg-green-100 text-green-800',

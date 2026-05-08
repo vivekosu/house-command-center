@@ -15,17 +15,19 @@ export default function Clarifications() {
   const [form, setForm] = useState({ question: '', assigned_to: '' })
   const [users, setUsers] = useState([])
 
+  useEffect(() => {
+    supabase.from('users').select('id,name').eq('project_id', import.meta.env.VITE_PROJECT_ID)
+      .then(({ data }) => setUsers(data || []))
+  }, [])
+
   useEffect(() => { loadData() }, [filter])
 
   async function loadData() {
     setLoading(true)
-    const [{ data: u }] = await Promise.all([
-      supabase.from('users').select('id,name').eq('project_id', import.meta.env.VITE_PROJECT_ID)
-    ])
     let q = supabase.from('clarifications').select('*, assigned_user:users!clarifications_assigned_to_fkey(name)').eq('project_id', import.meta.env.VITE_PROJECT_ID).order('created_at', { ascending: false })
     if (filter !== 'all') q = q.eq('status', filter)
     const { data: c } = await q
-    setItems(c || []); setUsers(u || [])
+    setItems(c || [])
     setLoading(false)
   }
 

@@ -23,7 +23,7 @@ export default function WhatsAppSend() {
     supabase.from('tasks').select('*, spaces(name,floor)').eq('project_id', import.meta.env.VITE_PROJECT_ID).not('status', 'in', '("done","verified","closed")').order('end_date').then(({data}) => setTasks(data || []))
   }, [])
 
-  useEffect(() => { buildPreview() }, [selectedVendor, selectedTask, selectedTemplate, extraParams])
+  useEffect(() => { if (selectedVendor) { buildPreview() } else { setPreview('') } }, [selectedVendor, selectedTask, selectedTemplate, extraParams])
 
   function buildPreview() {
     if (!selectedVendor) return setPreview('')
