@@ -275,7 +275,20 @@ function NewTaskForm({ navigate, currentUser }) {
 
   async function save() {
     if (!form.title.trim()) return alert('Please enter a task title')
-    const { data: task, error } = await supabase.from('tasks').insert({ ...form, project_id: import.meta.env.VITE_PROJECT_ID, space_id: selectedSpace || null, category_id: selectedCategory || null, created_by: currentUser?.id }).select().single()
+    // Convert empty date strings to null (Postgres rejects "" for date columns)
+    const cleanForm = {
+      ...form,
+      end_date: form.end_date && form.end_date.trim() ? form.end_date : null,
+      start_date: form.start_date && form.start_date.trim() ? form.start_date : null,
+    }
+    const payload = {
+      ...cleanForm,
+      project_id: import.meta.env.VITE_PROJECT_ID,
+      space_id: selectedSpace || null,
+      category_id: selectedCategory || null,
+      created_by: currentUser?.id || null
+    }
+    const { data: task, error } = await supabase.from('tasks').insert(payload).select().single()
     if (error) { alert('Failed to save: ' + error.message + '\n\nDetails: ' + (error.details || 'none') + '\nHint: ' + (error.hint || 'none')); return }
     if (!task) { alert('No task returned by server'); return }
     if (selectedVendors.length > 0) {
