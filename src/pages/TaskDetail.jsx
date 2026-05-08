@@ -19,6 +19,8 @@ export default function TaskDetail() {
   const [note, setNote] = useState('')
   const [showPhotoUpload, setShowPhotoUpload] = useState(false)
   const [showStatusPicker, setShowStatusPicker] = useState(false)
+  const [editingDates, setEditingDates] = useState(false)
+  const [dateForm, setDateForm] = useState({ start_date: '', end_date: '' })
   const [showPromiseForm, setShowPromiseForm] = useState(false)
   const [promiseForm, setPromiseForm] = useState({
     vendor_id: '',
@@ -39,6 +41,18 @@ export default function TaskDetail() {
       supabase.from('photos').select('*, users(name)').eq('task_id', id).order('taken_at', { ascending: false })
     ])
     setTask(t); setNotes(n || []); setPromises(p || []); setPhotos(ph || [])
+    if (t) setDateForm({ start_date: t.start_date || '', end_date: t.end_date || '' })
+  }
+
+  async function saveDates() {
+    const payload = {
+      start_date: dateForm.start_date && dateForm.start_date.trim() ? dateForm.start_date : null,
+      end_date: dateForm.end_date && dateForm.end_date.trim() ? dateForm.end_date : null,
+    }
+    const { error } = await supabase.from('tasks').update(payload).eq('id', id)
+    if (error) return alert('Failed: ' + error.message)
+    setEditingDates(false)
+    loadTask()
   }
 
   async function addNote() {
@@ -138,12 +152,28 @@ export default function TaskDetail() {
         <div className="bg-white border border-gray-100 rounded-xl p-3 mb-3">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-bold text-gray-500">Dates</div>
+            {isEditor && <button onClick={() => setEditingDates(!editingDates)} className="text-xs text-blue-600 font-medium">{editingDates ? 'Cancel' : 'Edit'}</button>}
           </div>
-          <div className="flex gap-4 text-xs text-gray-600">
-            {task.start_date && <div><span className="text-gray-400">Start: </span>{formatDate(task.start_date)}</div>}
-            {task.end_date && <div><span className="text-gray-400">Due: </span>{formatDate(task.end_date)}</div>}
-            {task.actual_end_date && <div><span className="text-gray-400">Done: </span>{formatDate(task.actual_end_date)}</div>}
-          </div>
+          {!editingDates && (
+            <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+              <div><span className="text-gray-400">Task given: </span>{task.start_date ? formatDate(task.start_date) : '—'}</div>
+              <div><span className="text-gray-400">Target: </span>{task.end_date ? formatDate(task.end_date) : '—'}</div>
+              {task.actual_end_date && <div><span className="text-gray-400">Done: </span>{formatDate(task.actual_end_date)}</div>}
+            </div>
+          )}
+          {editingDates && (
+            <div className="space-y-2">
+              <div>
+                <div className="text-[11px] font-bold text-gray-500 mb-0.5">Task given (start)</div>
+                <input type="date" value={dateForm.start_date} onChange={e => setDateForm({...dateForm, start_date: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none" />
+              </div>
+              <div>
+                <div className="text-[11px] font-bold text-gray-500 mb-0.5">Target completion (due)</div>
+                <input type="date" value={dateForm.end_date} onChange={e => setDateForm({...dateForm, end_date: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none" />
+              </div>
+              <button onClick={saveDates} className="w-full bg-blue-600 text-white py-2 rounded-xl text-sm font-semibold">Save dates</button>
+            </div>
+          )}
         </div>
 
         <div className="bg-white border border-gray-100 rounded-xl p-3 mb-3">
@@ -227,7 +257,7 @@ export default function TaskDetail() {
 }
 
 function NewTaskForm({ navigate, currentUser }) {
-  const [form, setForm] = useState({ title: '', status: 'planned', priority: 'normal', end_date: '' })
+  const [form, setForm] = useState({ title: '', status: 'planned', priority: 'normal', start_date: '', end_date: '' })
   const [spaces, setSpaces] = useState([])
   const [categories, setCategories] = useState([])
   const [vendors, setVendors] = useState([])
@@ -336,7 +366,14 @@ function NewTaskForm({ navigate, currentUser }) {
           <option value="">Select category</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <input type="date" value={form.end_date} onChange={e => setForm({...form, end_date: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none" />
+        <div>
+          <div className="text-xs font-bold text-gray-500 mb-1">Task given (start date)</div>
+          <input type="date" value={form.start_date} onChange={e => setForm({...form, start_date: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none" />
+        </div>
+        <div>
+          <div className="text-xs font-bold text-gray-500 mb-1">Target completion (due date)</div>
+          <input type="date" value={form.end_date} onChange={e => setForm({...form, end_date: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none" />
+        </div>
         <select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none bg-white">
           <option value="normal">Normal priority</option>
           <option value="critical">Critical</option>
