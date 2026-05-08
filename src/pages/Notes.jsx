@@ -21,6 +21,7 @@ export default function Notes() {
   const [vendors, setVendors] = useState([])
   const [recording, setRecording] = useState(false)
   const [usedVoice, setUsedVoice] = useState(false)
+  const [voiceLang, setVoiceLang] = useState('en-IN')
   const recRef = useRef(null)
 
   useEffect(() => { loadNotes() }, [filter])
@@ -76,6 +77,7 @@ export default function Notes() {
     setRecording(true)
     setUsedVoice(true)
     recRef.current = startVoiceRecognition({
+      lang: voiceLang,
       onResult: (text) => setContent(c => c ? `${c} ${text}` : text),
       onEnd: () => setRecording(false),
       onError: (err) => { setRecording(false); alert('Voice error: ' + err) }
@@ -137,6 +139,12 @@ export default function Notes() {
               rows={3}
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none resize-none mb-2"
             />
+            <div className="flex gap-2 mb-2">
+              <span className="text-xs text-gray-500 self-center mr-1">Voice in:</span>
+              {[['en-IN', 'English'], ['hi-IN', 'Hindi']].map(([code, label]) => (
+                <button key={code} onClick={() => setVoiceLang(code)} className={`text-xs px-3 py-1 rounded-full ${voiceLang === code ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>{label}</button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <button onClick={toggleVoice} className={`flex-1 py-2.5 rounded-xl text-sm font-medium ${recording ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-gray-100 text-gray-700'}`}>
                 {recording ? '⏹ Stop recording' : '🎤 Voice note'}
@@ -144,7 +152,7 @@ export default function Notes() {
               <button onClick={() => { setShowForm(false); setContent(''); setEntityId(''); setUsedVoice(false) }} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm">Cancel</button>
               <button onClick={saveNote} className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold">Save</button>
             </div>
-            <div className="text-[11px] text-gray-400 mt-2">Voice works on Chrome (Android) and Safari (iPhone). Hindi + English supported.</div>
+            <div className="text-[11px] text-gray-400 mt-2">Speak in the selected language. The app does NOT translate — speak the language you want stored.</div>
           </div>
         )}
 

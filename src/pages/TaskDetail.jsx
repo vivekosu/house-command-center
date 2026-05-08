@@ -236,6 +236,7 @@ function NewTaskForm({ navigate, currentUser }) {
   const [selectedVendors, setSelectedVendors] = useState([])
   const [recording, setRecording] = useState(false)
   const [recRef, setRecRef] = useState(null)
+  const [voiceLang, setVoiceLang] = useState('en-IN')
 
   useEffect(() => {
     Promise.all([
@@ -255,6 +256,7 @@ function NewTaskForm({ navigate, currentUser }) {
     }
     setRecording(true)
     const r = startVoiceRecognition({
+      lang: voiceLang,
       onResult: (text) => {
         const parsed = parseTranscriptToTask(text)
         // Try to match suggested floor and category to actual records
@@ -272,11 +274,13 @@ function NewTaskForm({ navigate, currentUser }) {
   }
 
   async function save() {
-    if (!form.title.trim()) return
+    if (!form.title.trim()) return alert('Please enter a task title')
     const { data: task, error } = await supabase.from('tasks').insert({ ...form, project_id: import.meta.env.VITE_PROJECT_ID, space_id: selectedSpace || null, category_id: selectedCategory || null, created_by: currentUser?.id }).select().single()
-    if (error || !task) { alert('Failed to save task. Please try again.'); return }
-    if (task && selectedVendors.length > 0) {
-      await supabase.from('task_vendors').insert(selectedVendors.map(vid => ({ task_id: task.id, vendor_id: vid, is_primary: true })))
+    if (error) { alert('Failed to save: ' + error.message + '\n\nDetails: ' + (error.details || 'none') + '\nHint: ' + (error.hint || 'none')); return }
+    if (!task) { alert('No task returned by server'); return }
+    if (selectedVendors.length > 0) {
+      const { error: tvErr } = await supabase.from('task_vendors').insert(selectedVendors.map(vid => ({ task_id: task.id, vendor_id: vid, is_primary: true })))
+      if (tvErr) alert('Task saved but vendors not linked: ' + tvErr.message)
     }
     navigate(`/tasks/${task.id}`)
   }
@@ -289,12 +293,18 @@ function NewTaskForm({ navigate, currentUser }) {
         <button onClick={save} className="text-blue-600 font-semibold text-sm">Save</button>
       </div>
       <div className="px-4 py-3 space-y-3">
+        <div className="flex gap-2 items-center">
+          <span className="text-xs text-gray-500">Voice in:</span>
+          {[['en-IN', 'English'], ['hi-IN', 'Hindi']].map(([code, label]) => (
+            <button key={code} type="button" onClick={() => setVoiceLang(code)} className={`text-xs px-3 py-1 rounded-full ${voiceLang === code ? 'bg-blue-600 text-white' : 'bg-white border border-gray-200 text-gray-600'}`}>{label}</button>
+          ))}
+        </div>
         <button
           type="button"
           onClick={toggleVoice}
           className={`w-full py-3 rounded-xl text-sm font-semibold ${recording ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-blue-50 text-blue-700 border-2 border-dashed border-blue-300'}`}
         >
-          {recording ? '⏹ Stop recording' : '🎤 Speak the task (auto-fills below)'}
+          {recording ? '⏹ Stop recording' : `🎤 Speak the task in ${voiceLang === 'en-IN' ? 'English' : 'Hindi'} (auto-fills below)`}
         </button>
         <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Task title" className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none" />
         <select value={selectedSpace} onChange={e => setSelectedSpace(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none bg-white">
