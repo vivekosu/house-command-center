@@ -8,7 +8,7 @@ import BottomNav from '../components/ui/BottomNav'
 import Header from '../components/ui/Header'
 
 export default function Photos() {
-  const { currentUser, isEditor } = useRole()
+  const { currentUser, isEditor, isOwner } = useRole()
   const navigate = useNavigate()
   const [photos, setPhotos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -67,13 +67,35 @@ export default function Photos() {
     setLoading(false)
   }
 
+  async function deletePhoto(photo) {
+    if (!confirm('Delete this photo permanently? This cannot be undone.')) return
+    // Try to delete from storage first
+    if (photo.storage_path) {
+      const { error: storageErr } = await supabase.storage.from('site-photos').remove([photo.storage_path])
+      if (storageErr) console.warn('Storage delete failed:', storageErr.message)
+    }
+    // Then delete the DB row
+    const { error } = await supabase.from('photos').delete().eq('id', photo.id)
+    if (error) return alert('Failed to delete: ' + error.message)
+    setSelected(null)
+    loadPhotos()
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {showUpload && <PhotoUpload taskId={null} userId={currentUser?.id} onClose={() => setShowUpload(false)} onDone={() => { setShowUpload(false); loadPhotos() }} />}
       {selected && (
-        <div className="fixed inset-0 bg-black z-50 flex items-center justify-center" onClick={() => setSelected(null)}>
-          <img src={selected.public_url} alt={selected.description} className="max-w-full max-h-full object-contain" />
-          <div className="absolute bottom-8 left-4 right-4 text-white text-sm text-center">
+        <div className="fixed inset-0 bg-black z-50 flex flex-col" onClick={() => setSelected(null)}>
+          <div className="flex items-center justify-between p-3" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelected(null)} className="text-white text-sm font-medium px-3 py-1.5">✕ Close</button>
+            {isOwner && (
+              <button onClick={() => deletePhoto(selected)} className="bg-red-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg">🗑 Delete</button>
+            )}
+          </div>
+          <div className="flex-1 flex items-center justify-center px-3">
+            <img src={selected.public_url} alt={selected.description} className="max-w-full max-h-full object-contain" />
+          </div>
+          <div className="text-white text-sm text-center px-4 pb-8">
             {selected.description}
             {selected.taskTitle && <div className="text-xs opacity-75 mt-1">Task: {selected.taskTitle}</div>}
           </div>

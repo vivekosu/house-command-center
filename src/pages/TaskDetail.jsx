@@ -10,7 +10,7 @@ const STATUSES = ['planned','in_progress','waiting_vendor','waiting_material','w
 
 export default function TaskDetail() {
   const { id } = useParams()
-  const { currentUser, isEditor } = useRole()
+  const { currentUser, isEditor, isOwner } = useRole()
   const navigate = useNavigate()
   const [task, setTask] = useState(null)
   const [notes, setNotes] = useState([])
@@ -21,6 +21,7 @@ export default function TaskDetail() {
   const [showStatusPicker, setShowStatusPicker] = useState(false)
   const [editingDates, setEditingDates] = useState(false)
   const [dateForm, setDateForm] = useState({ start_date: '', end_date: '' })
+  const [selectedPhoto, setSelectedPhoto] = useState(null)
   const [showPromiseForm, setShowPromiseForm] = useState(false)
   const [promiseForm, setPromiseForm] = useState({
     vendor_id: '',
@@ -59,6 +60,19 @@ export default function TaskDetail() {
     if (!note.trim()) return
     await supabase.from('notes').insert({ entity_type: 'task', entity_id: id, content: note, source: 'typed', added_by_user: currentUser?.id })
     setNote(''); loadTask()
+  }
+
+  async function deleteSelectedPhoto() {
+    if (!selectedPhoto) return
+    if (!confirm('Delete this photo permanently? This cannot be undone.')) return
+    if (selectedPhoto.storage_path) {
+      const { error: stErr } = await supabase.storage.from('site-photos').remove([selectedPhoto.storage_path])
+      if (stErr) console.warn('Storage delete failed:', stErr.message)
+    }
+    const { error } = await supabase.from('photos').delete().eq('id', selectedPhoto.id)
+    if (error) return alert('Failed to delete: ' + error.message)
+    setSelectedPhoto(null)
+    loadTask()
   }
 
   async function updateStatus(status) {
@@ -127,19 +141,21 @@ export default function TaskDetail() {
               const v = tv.vendors; if (!v) return null
               const esc = escalationLevel(v.missed_count || 0)
               return (
-                <div key={v.id} className="py-1.5">
-                  <div className="flex items-center justify-between">
+                <div key={v.id} className="py-2 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center justify-between mb-1.5">
                     <div className="flex-1">
                       <div className="text-sm font-medium text-gray-900">{v.name}</div>
                       <div className="text-xs text-gray-400">{v.phone} · missed: {v.missed_count || 0}</div>
                     </div>
-                    <div className="flex gap-2">
-                      <a href={`tel:${v.phone}`} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-lg">Call</a>
-                      <a href={`https://wa.me/${v.phone?.replace(/\D/g,'')}`} target="_blank" className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-lg">WhatsApp</a>
-                    </div>
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    <a href={`tel:${v.phone}`} className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-lg">📞 Call</a>
+                    <a href={`https://wa.me/${v.phone?.replace(/\D/g,'')}`} target="_blank" className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">💬 Open chat</a>
+                    <button onClick={() => navigate(`/whatsapp?rtype=vendor&vendor=${v.id}&task=${id}&mode=template`)} className="text-xs bg-green-600 text-white px-2 py-1 rounded-lg font-medium">📋 Send task w/ template</button>
+                    <button onClick={() => navigate(`/whatsapp?rtype=vendor&vendor=${v.id}&task=${id}&mode=free`)} className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">✏️ Free message</button>
                   </div>
                   {esc && (
-                    <div className={`mt-1.5 text-[11px] px-2 py-1 rounded-lg font-medium ${esc.level <= 2 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
+                    <div className={`mt-2 text-[11px] px-2 py-1 rounded-lg font-medium ${esc.level <= 2 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}>
                       ⚠️ Escalation level {esc.level}: {esc.action}
                     </div>
                   )}
@@ -148,6 +164,17 @@ export default function TaskDetail() {
             })}
           </div>
         )}
+
+        {/* Notify team / family — independent of vendors */}
+        <div className="bg-white border border-gray-100 rounded-xl p-3 mb-3">
+          <div className="text-xs font-bold text-gray-500 mb-2">Notify team / family</div>
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={() => navigate(`/whatsapp?rtype=user&task=${id}&mode=free`)} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-medium">
+              📱 Send to team / family
+            </button>
+          </div>
+          <div className="text-[11px] text-gray-400 mt-2">Send a reminder or update to your wife, supervisor, architect, etc.</div>
+        </div>
 
         <div className="bg-white border border-gray-100 rounded-xl p-3 mb-3">
           <div className="flex items-center justify-between mb-2">
@@ -227,8 +254,33 @@ export default function TaskDetail() {
           <div className="mb-3">
             <div className="text-xs font-bold text-gray-500 mb-2">Photos ({photos.length})</div>
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {photos.map(ph => <img key={ph.id} src={ph.public_url} alt={ph.description} className="w-20 h-20 object-cover rounded-xl flex-shrink-0" />)}
+              {photos.map(ph => (
+                <img
+                  key={ph.id}
+                  src={ph.public_url}
+                  alt={ph.description}
+                  onClick={() => setSelectedPhoto(ph)}
+                  className="w-20 h-20 object-cover rounded-xl flex-shrink-0 cursor-pointer"
+                />
+              ))}
             </div>
+          </div>
+        )}
+
+        {selectedPhoto && (
+          <div className="fixed inset-0 bg-black z-50 flex flex-col" onClick={() => setSelectedPhoto(null)}>
+            <div className="flex items-center justify-between p-3" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setSelectedPhoto(null)} className="text-white text-sm font-medium px-3 py-1.5">✕ Close</button>
+              {isOwner && (
+                <button onClick={deleteSelectedPhoto} className="bg-red-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg">🗑 Delete</button>
+              )}
+            </div>
+            <div className="flex-1 flex items-center justify-center px-3">
+              <img src={selectedPhoto.public_url} alt={selectedPhoto.description} className="max-w-full max-h-full object-contain" />
+            </div>
+            {selectedPhoto.description && (
+              <div className="text-white text-sm text-center px-4 pb-8">{selectedPhoto.description}</div>
+            )}
           </div>
         )}
 
