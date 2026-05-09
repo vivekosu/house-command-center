@@ -7,6 +7,26 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Workbox config: ALWAYS hit the network for Supabase API calls.
+      // Without this, iOS Safari's PWA service worker can return stale
+      // "Load failed" responses from cache.
+      workbox: {
+        navigateFallbackDenylist: [/^\/api/, /supabase\.co/],
+        runtimeCaching: [
+          {
+            urlPattern: /supabase\.co\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /^https?:\/\/.*\.(?:png|jpg|jpeg|svg|gif|webp)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'images',
+              expiration: { maxEntries: 50, maxAgeSeconds: 7 * 24 * 60 * 60 },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'House Command Center',
         short_name: 'HouseCmd',

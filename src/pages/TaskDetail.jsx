@@ -357,7 +357,6 @@ function NewTaskForm({ navigate, currentUser }) {
 
   async function save() {
     if (!form.title.trim()) return alert('Please enter a task title')
-    // Convert empty date strings to null (Postgres rejects "" for date columns)
     const cleanForm = {
       ...form,
       end_date: form.end_date && form.end_date.trim() ? form.end_date : null,
@@ -370,8 +369,30 @@ function NewTaskForm({ navigate, currentUser }) {
       category_id: selectedCategory || null,
       created_by: currentUser?.id || null
     }
-    const { data: task, error } = await supabase.from('tasks').insert(payload).select().single()
-    if (error) { alert('Failed to save: ' + error.message + '\n\nDetails: ' + (error.details || 'none') + '\nHint: ' + (error.hint || 'none')); return }
+
+    // Retry once on iOS network errors ("Load failed")
+    let task, error
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const result = await supabase.from('tasks').insert(payload).select().single()
+        task = result.data
+        error = result.error
+        if (!error) break
+      } catch (e) {
+        error = { message: e.message || String(e) }
+      }
+      if (attempt < 2) await new Promise(r => setTimeout(r, 800))
+    }
+
+    if (error) {
+      const msg = error.message || 'Unknown error'
+      if (msg.includes('Load failed') || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        alert('Network error — check your internet connection and try again.\n\nIf you keep seeing this on iPhone, try:\n1. Settings → Safari → Clear History\n2. Or open in Chrome/Brave instead of Safari')
+      } else {
+        alert('Failed to save: ' + msg + '\n\nDetails: ' + (error.details || 'none') + '\nHint: ' + (error.hint || 'none'))
+      }
+      return
+    }
     if (!task) { alert('No task returned by server'); return }
     if (selectedVendors.length > 0) {
       const { error: tvErr } = await supabase.from('task_vendors').insert(selectedVendors.map(vid => ({ task_id: task.id, vendor_id: vid, is_primary: true })))
